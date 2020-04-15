@@ -258,13 +258,26 @@ def run_conditions():
                                      threads, racon4_polish)
         os.system('rm -r %s' % sam_file4)
         infile6 = "{0}/shortRead_polish_results/{1}_racon{2}.fasta".format(outdir, sample_name, racon4_polish)
+        print("Executing fix repeat script")
+        subprocess.Popen("sed '/^>/ s/ .*//' -i " + infile6, shell=True).wait()
+        subprocess.Popen('bwa index ' + infile6, shell=True).wait()
+        bam_infile6 = "{0}/shortRead_polish_results/{1}_racon{2}_sort.bam".format(outdir, sample_name, racon4_polish)
+        subprocess.Popen('bwa mem -t ' + threads + ' ' + infile6 + ' ' + pe_reads + \
+                         ' | samtools sort -@ ' + threads + ' > ' + bam_infile6, shell=True).wait()
+        coverage_file = "{0}/shortRead_polish_results/coverage.txt".format(outdir)
+        subprocess.Popen('bedtools genomecov -d -ibam ' + bam_infile6 + ' > ' + coverage_file, shell=True).wait()
+        infile7 = "{0}/shortRead_polish_results/{1}_repeat_fix.fasta".format(outdir, sample_name)
+        tmp_directory = "{0}/shortRead_polish_results/tmp".format(outdir)
+        subprocess.Popen('python3 /data/opt/scripts/fix_repeats_ill.py -w ' + tmp_directory + ' -r ' + pe_reads + \
+                         ' -c ' + coverage_file + ' -g ' + infile6 + ' -o ' + infile7 + ' -t ' + threads, shell=True).wait()
         print("Executing Racon for fifth and final round of polishing")
         racon5_polish = 5
-        make_bwa_command(args.bwa_path, infile6, pe_reads, shortRead_polish_outdir, threads, racon5_polish)
+        make_bwa_command(args.bwa_path, infile7, pe_reads, shortRead_polish_outdir, threads, racon5_polish)
         sam_file5 = "{0}/shortRead_polish_results/align_{1}.sam".format(outdir, racon5_polish)
         make_racon_shortRead_command(args.racon_path, pe_reads, sam_file5, infile6, outdir, sample_name,
                                      threads, racon5_polish)
         os.system('rm -r %s' % sam_file5)
+        os.system('rm -r %s' % tmp_directory)
         print("Fin! Enjoy your day!")
     if args.existing_contigs:
         print("Circularization check with berokka and creating input for long-read initial round of polishing")
@@ -324,13 +337,27 @@ def run_conditions():
                                      threads, racon4_polish)
         os.system('rm -r %s' % sam_file4)
         infile6 = "{0}/shortRead_polish_results/{1}_racon{2}.fasta".format(outdir, sample_name, racon4_polish)
+        print("Executing fix repeat script")
+        subprocess.Popen("sed '/^>/ s/ .*//' -i " + infile6, shell=True).wait()
+        subprocess.Popen('bwa index ' + infile6, shell=True).wait()
+        bam_infile6 = "{0}/shortRead_polish_results/{1}_racon{2}_sort.bam".format(outdir, sample_name, racon4_polish)
+        subprocess.Popen('bwa mem -t ' + threads + ' ' + infile6 + ' ' + pe_reads + \
+                         ' | samtools sort -@ ' + threads + ' > ' + bam_infile6, shell=True).wait()
+        coverage_file = "{0}/shortRead_polish_results/coverage.txt".format(outdir)
+        subprocess.Popen('bedtools genomecov -d -ibam ' + bam_infile6 + ' > ' + coverage_file, shell=True).wait()
+        infile7 = "{0}/shortRead_polish_results/{1}_repeat_fix.fasta".format(outdir, sample_name)
+        tmp_directory = "{0}/shortRead_polish_results/tmp".format(outdir)
+        subprocess.Popen('python3 /data/opt/scripts/fix_repeats_ill.py -w ' + tmp_directory + ' -r ' + pe_reads + ' -c ' + coverage_file + \
+                         ' -g ' + infile6 + ' -o ' + infile7 + ' -t ' + threads, shell=True).wait()
         print("Executing Racon for fifth and final round of polishing")
         racon5_polish = 5
-        make_bwa_command(args.bwa_path, infile6, pe_reads, shortRead_polish_outdir, threads, racon5_polish)
+        make_bwa_command(args.bwa_path, infile7, pe_reads, shortRead_polish_outdir, threads, racon5_polish)
         sam_file5 = "{0}/shortRead_polish_results/align_{1}.sam".format(outdir, racon5_polish)
         make_racon_shortRead_command(args.racon_path, pe_reads, sam_file5, infile6, outdir, sample_name,
                                      threads, racon5_polish)
         os.system('rm -r %s' % sam_file5)
+        os.system('rm -r %s' % tmp_directory)
+        print("Fin! Enjoy your day!")
 # Perform some basic checks for assembly
         print("Fin! Enjoy your day!")
 
