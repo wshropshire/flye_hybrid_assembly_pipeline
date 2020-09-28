@@ -140,12 +140,12 @@ def get_arguments():
 
     # input_arguments
     input_group = parser.add_argument_group("Inputs")
-    input_group.add_argument('-s', '--sample_name', required=True, help="Name of the sample to use in the "
+    input_group.add_argument('-s', '--sample_name', required=False, help="Name of the sample to use in the "
                                                                         "outdir/outfiles as prefix", type=str,
+                             default='SAMPLE')
+    input_group.add_argument('-pe', '--pe_reads', required=True, help='interleave paired-end reads', type=str,
                              default=None)
-    input_group.add_argument('-pe', '--pe_reads', required=False, help='interleave paired-end reads', type=str,
-                             default=None)
-    input_group.add_argument('-l', '--long_reads', required=False, help="Path to the ONT long reads", type=str,
+    input_group.add_argument('-l', '--long_reads', required=True, help="Path to the ONT long reads", type=str,
                              default=None)
     input_group.add_argument('-x', '--existing_contigs', required=False, action="store_true",
                              help='indicate if existing contigs are going to be used from previous assembly.',
@@ -337,7 +337,7 @@ def run_conditions():
                                      threads, racon4_polish)
         os.system('rm -r %s' % sam_file4)
         infile6 = "{0}/shortRead_polish_results/{1}_racon{2}.fasta".format(outdir, sample_name, racon4_polish)
-        print("Executing fix repeat script")
+        print("Executing fix repeat script which generates final assembly")
         subprocess.Popen("sed '/^>/ s/ .*//' -i " + infile6, shell=True).wait()
         subprocess.Popen('bwa index ' + infile6, shell=True).wait()
         bam_infile6 = "{0}/shortRead_polish_results/{1}_racon{2}_sort.bam".format(outdir, sample_name, racon4_polish)
@@ -349,17 +349,7 @@ def run_conditions():
         tmp_directory = "{0}/shortRead_polish_results/tmp".format(outdir)
         subprocess.Popen('python3 /data/opt/scripts/fix_repeats_ill.py -w ' + tmp_directory + ' -r ' + pe_reads + ' -c ' + coverage_file + \
                          ' -g ' + infile6 + ' -o ' + infile7 + ' -t ' + threads, shell=True).wait()
-        print("Executing Racon for fifth and final round of polishing")
-        racon5_polish = 5
-        make_bwa_command(args.bwa_path, infile7, pe_reads, shortRead_polish_outdir, threads, racon5_polish)
-        sam_file5 = "{0}/shortRead_polish_results/align_{1}.sam".format(outdir, racon5_polish)
-        make_racon_shortRead_command(args.racon_path, pe_reads, sam_file5, infile6, outdir, sample_name,
-                                     threads, racon5_polish)
-        os.system('rm -r %s' % sam_file5)
         os.system('rm -r %s' % tmp_directory)
         print("Fin! Enjoy your day!")
-# Perform some basic checks for assembly
-        print("Fin! Enjoy your day!")
-
 
 if __name__ == '__main__': run_conditions()
