@@ -32,7 +32,7 @@ Versions above have been tested. Older or newer versions may work, but could cre
 
 Required input are: 
 (1) out-directory (**outdir**) 
-(2) database of *dnaA* genes or other genes of inteerest for orientation (e.g. *repA* genes for plasmids) - (**uniport_dnaA.nucleotides.fa** is provided in this repository
+(2) database of *dnaA* genes or other genes of inteerest for orientation (e.g. *repA* genes for plasmids) - **uniport_dnaA.nucleotides.fa** is provided in this repository
 (3) ONT long-reads (either gzip or non-compressed files will work)
 (4) Interleaved paired-end short-reads (either gzip or non-compressed files will work)
 (5) **genome_size** estimated genome size based on previous knowledge of species (+/- 1 Mb genome size estimate is fine for flye k-mer selection)
