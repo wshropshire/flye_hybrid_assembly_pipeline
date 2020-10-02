@@ -64,5 +64,5 @@ If assembly metrics found in `outdirName/flye_assembly/assembly_info.txt` are no
 
 ## Future Updates
 
-Need to remove hardcode options for `--meta` and '--plasmids` and create argparse options for usage. 
+Need to remove hardcode options for `--meta` and `--plasmids` and create argparse options for usage. 
 
