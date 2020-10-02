@@ -52,4 +52,17 @@ Usage for error correction of previously assembled genome:
 $python3 flye_pipeline.py -t 2 -s sample_name -o outdir -d uniport_dnaA.nucleotides.fa -x -c assembly.fasta -pe interleaved_pe_reads.fastq.gz -l long_reads.fastq.gz
 ```
 
+## Output
+
+Final assembly can be found in `outdir_name/shortRead_polish_results/` and will be named **sampleName_repeat_fix.fasta**
+
+## Usage tips
+
+Note that any database of genes of interest to orient contigs can be used for the purposes of orienting any linear or circular DNA structure when using the `-d` paramter in pipeline. For example, if assembling *K. pneumoniae* genomes, one can use the manually curated, database of commonly observed F-type replication initiation protein genes found in plasmids as well as the *dnaA* gene for *K. pneumoniae* in the db directory with the file name **dnaA_and_plasmid_startSites.fasta**. 
+
+If assembly metrics found in `outdirName/flye_assembly/assembly_info.txt` are not satisfactory, another option is to use the **flye_pipeline_mod.py** script that does not use the `--meta` nor `--plasmid` parameters. Will fix hardcoding in future update. 
+
+## Future Updates
+
+Need to remove hardcode options for `--meta` and '--plasmids' and create argparse options for usage. 
 
