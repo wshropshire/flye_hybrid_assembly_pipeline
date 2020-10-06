@@ -16,6 +16,7 @@ Consensus bacterial genome assembly pipeline that utilizes the Flye assembler (h
 * perl (≥ 5.28.0)
 * ncbi-blast+ (≥ 2.10.0)
 * Python (≥ 3.6.0)
+* Medaka (≥ 0.11.5)
 * MUMmer (≥ 3.23)
 * Prodigal (≥ 2.6.3)
 * Minimap2 (≥ 2.17-r974)
