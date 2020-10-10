@@ -3,6 +3,7 @@
 import os
 import subprocess
 import argparse
+import fix_repeats
 
 """Notes for an eventual protocol for this pipeline"""
 # Note that you need a local install of flye to properly run the make_flye_command() function.
@@ -32,8 +33,20 @@ def create_directory(outdir):
 # make_flye_command() passes 7 arguments, creates a simple flye command to be executed through the os by the subprocess
 # module, and sends output into the outdir provided in the command prompt.
 
-
 def make_flye_command(flye_path, long_reads, outdir, sample_name, genome_size, threads):
+    # Fix the random seed so the program produces the same output every time it's run.
+    # random.seed(1987)
+    # Note, in order to use subprocess, you cannot use integer or float arguments, thus all arguments passed to subprocess
+    # must be strings
+    flye_cmd = [flye_path, "--nano-raw", long_reads, "--genome-size", genome_size,
+                "-o", "{0}/flye_assembly".format(outdir, sample_name), "--threads", threads]
+    print("Performing Flye Assembly")
+    subprocess.run(flye_cmd)
+    print("Flye Assembly Finished")
+    flye_directory = "{0}/flye_assembly".format(outdir)
+    return flye_directory
+
+def make_flye_command_alt(flye_path, long_reads, outdir, sample_name, genome_size, threads):
     # Fix the random seed so the program produces the same output every time it's run.
     # random.seed(1987)
     # Note, in order to use subprocess, you cannot use integer or float arguments, thus all arguments passed to subprocess
@@ -45,7 +58,6 @@ def make_flye_command(flye_path, long_reads, outdir, sample_name, genome_size, t
     print("Flye Assembly Finished")
     flye_directory = "{0}/flye_assembly".format(outdir)
     return flye_directory
-
 
 # simple execution of berokka through subprocess module
 def make_berokka_command(berokka_path, infile, outdir):
@@ -140,23 +152,33 @@ def get_arguments():
 
     # input_arguments
     input_group = parser.add_argument_group("Inputs")
-    input_group.add_argument('-s', '--sample_name', required=False, help="Name of the sample to use in the "
-                                                                        "outdir/outfiles as prefix", type=str,
-                             default='SAMPLE')
     input_group.add_argument('-pe', '--pe_reads', required=True, help='interleave paired-end reads', type=str,
                              default=None)
     input_group.add_argument('-l', '--long_reads', required=True, help="Path to the ONT long reads", type=str,
                              default=None)
-    input_group.add_argument('-x', '--existing_contigs', required=False, action="store_true",
+    input_group.add_argument('-d', '--dnaA_file', required=False, help="dnaA (default) start sites", type=str,
+                            default=None)
+    input_group.add_argument('-o', '--outdir', required=True, help="Name of the output directory", type=str,
+                                default=None)
+    input_group.add_argument('-g', '--genome_size', required=False, help="Estimated genome size for assembly", 
+                            default=None)
+    
+    # Optional arguments
+    optional_group = parser.add_argument_group("Optional inputs")
+    optional_group.add_argument('-s', '--sample_name', required=False, help="Name of the sample to use in the "
+                                "outdir/outfiles as prefix", type=str, default='SAMPLE')
+    optional_group.add_argument('-mp', help="add \'meta\' and \'plasmid\' Flye options", action ='store_true')
+    optional_group.add_argument('-x', '--existing_contigs', required=False, action="store_true",
                              help='indicate if existing contigs are going to be used from previous assembly.',
                              default=False)
-    input_group.add_argument('-c', '--contigs', required=False, help="existing contigs fasta file", type=str,
+    optional_group.add_argument('-c', '--contigs', required=False, help="existing contigs fasta file", type=str,
                              default=None)
-    input_group.add_argument('-d', '--dnaA_file', required=True, help="dnaA (default) start sites", type=str,
-                             default='uniprot_dnaA.nucleotides.fa')
-
+    optional_group.add_argument('-t', '--threads', required=False, help="Number of threads to run program", type=str,
+                                default='1')
     # Pipeline arguments
     pipeline_group = parser.add_argument_group("Pipeline Arguments")
+    pipeline_group.add_argument('--flye_path', required=False, help="Path to flye executable; please use \'flye\' if"
+                                "with path", type=str, default='flye')
     pipeline_group.add_argument('--berokka_path', required=False, help="Path to berokka executable. Please use "
                                 "\'berokka\' with path", type=str, default='berokka')
     pipeline_group.add_argument('--circlator_path', required=False, help="Path to circlator executable; "
@@ -171,18 +193,7 @@ def get_arguments():
     pipeline_group.add_argument('--medaka_path', required=False, help='Path to medaka executable. Please use'
                                 '\'medaka_consensus\' in the pathway', type=str, default='medaka_consensus')
 
-    # Flye arguments
-    flye_group = parser.add_argument_group("Flye")
-    flye_group.add_argument('--flye_path', required=False, help="Path to flye executable; please use \'flye\' if"
-                            "with path", type=str, default='flye')
-    flye_group.add_argument("--genome_size", required=False, help="Estimated genome size for assembly", default=None)
 
-    # Optional and Output arguments
-    optional_group = parser.add_argument_group("Output and Options")
-    optional_group.add_argument('-o', '--outdir', required=True, help="Name of the output directory", type=str,
-                                default=None)
-    optional_group.add_argument('-t', '--threads', required=False, help="Number of threads to run program", type=str,
-                                default='1')
     args = parser.parse_args()
     return args
 
@@ -196,14 +207,23 @@ def run_conditions():
     threads = args.threads
     pe_reads = args.pe_reads
     create_directory(args.outdir)
+    dir = os.path.dirname(__file__)
+    default_db = os.path.join(dir, './../db/uniprot_dnaA.nucleotides.fa')
+
     # conditional argument that executes assembly + circularization check
     if not args.existing_contigs:
-        make_flye_command(args.flye_path, long_reads, outdir, sample_name, args.genome_size, threads)
-        os.system("mv %s %s" % ("{0}/flye_assembly/assembly.fasta".format(outdir, sample_name),
+        if args.mp is True:
+            make_flye_command_alt(args.flye_path, long_reads, outdir, sample_name, args.genome_size, threads)
+            os.system("mv %s %s" % ("{0}/flye_assembly/assembly.fasta".format(outdir, sample_name),
+                                    "{0}/flye_assembly/{1}_assembly.fasta".format(outdir, sample_name)))
+            infile0 = "{0}/flye_assembly/{1}_assembly.fasta".format(outdir, sample_name)
+        else:
+            make_flye_command(args.flye_path, long_reads, outdir, sample_name, args.genome_size, threads)
+            os.system("mv %s %s" % ("{0}/flye_assembly/assembly.fasta".format(outdir, sample_name),
                                 "{0}/flye_assembly/{1}_assembly.fasta".format(outdir, sample_name)))
-        infile0 = "{0}/flye_assembly/{1}_assembly.fasta".format(outdir, sample_name)
+            infile0 = "{0}/flye_assembly/{1}_assembly.fasta".format(outdir, sample_name)
         print("Circularization check with berokka and creating input for long-read initial round of polishing")
-        make_berokka_command(args.berokka_path, infile0, outdir)
+        make_berokka_command(args.berokka_path, infile0, args.outdir)
         infile1 = "{0}/berokka_results/02.trimmed.fa".format(outdir)
         print("Removing potential self-contained contigs")
         circlator_clean_outfile_prefix = "{0}/berokka_results/{1}_clean".format(outdir, sample_name)
@@ -223,85 +243,10 @@ def run_conditions():
         print("Executing Circlator Fixstart to obtain start position(s)")
         circlator_outfile_prefix = "{0}/longRead_polish_results/{1}_circlator".format(outdir, sample_name)
         circlator_outfile = "{0}/longRead_polish_results/{1}_circlator.fasta".format(outdir, sample_name)
-        make_circlator_fixstart_command(args.circlator_path, args.dnaA_file, infile3, circlator_outfile_prefix)
-        print("Perform Racon Polish #2")
-        racon2_polish = 2
-        make_minimap2_command(args.minimap2_path, circlator_outfile, long_reads, threads, longRead_outdir, racon2_polish)
-        sam_file2 = '{0}/longRead_polish_results/align_{1}.sam'.format(outdir, racon2_polish)
-        make_racon_longRead_command(args.racon_path, long_reads, sam_file2, circlator_outfile, outdir, sample_name,
-                                    threads, racon2_polish)
-        os.system('rm -r %s' % sam_file2)
-        print("Perform long read polishes with Medaka")
-        medaka_input = "{0}/longRead_polish_results/{1}_racon{2}.fasta".format(outdir, sample_name, racon2_polish)
-        make_medaka_command(args.medaka_path, long_reads, medaka_input, outdir, threads)
-        print("Executing shortRead polishes with Racon")
-        infile4 = "{0}/medaka_results/consensus.fasta".format(outdir)
-        shortRead_polish_outdir = "{0}/shortRead_polish_results".format(outdir)
-        create_directory(shortRead_polish_outdir)
-        racon3_polish = 3
-        make_bwa_command(args.bwa_path, infile4, pe_reads, shortRead_polish_outdir, threads, racon3_polish)
-        print("Executing Racon for third round of polishing")
-        sam_file3 = "{0}/shortRead_polish_results/align_{1}.sam".format(outdir, racon3_polish)
-        make_racon_shortRead_command(args.racon_path, pe_reads, sam_file3, infile4, outdir, sample_name,
-                                     threads, racon3_polish)
-        os.system('rm -r %s' % sam_file3)
-        infile5 = "{0}/shortRead_polish_results/{1}_racon{2}.fasta".format(outdir, sample_name, racon3_polish)
-        print("Executing circulating fixstart to rotate #2 and orient properly")
-        circlator_outfile_prefix2 = "{0}/shortRead_polish_results/{1}_circlator2".format(outdir, sample_name)
-        circlator_outfile2 = "{0}/shortRead_polish_results/{1}_circlator2.fasta".format(outdir, sample_name)
-        make_circlator_fixstart_command(args.circlator_path, args.dnaA_file, infile5, circlator_outfile_prefix2)
-        print("Executing Racon for fourth round of polishing")
-        racon4_polish = 4
-        make_bwa_command(args.bwa_path, circlator_outfile2, pe_reads, shortRead_polish_outdir, threads, racon4_polish)
-        sam_file4 = "{0}/shortRead_polish_results/align_{1}.sam".format(outdir, racon4_polish)
-        make_racon_shortRead_command(args.racon_path, pe_reads, sam_file4, circlator_outfile2, outdir, sample_name,
-                                     threads, racon4_polish)
-        os.system('rm -r %s' % sam_file4)
-        infile6 = "{0}/shortRead_polish_results/{1}_racon{2}.fasta".format(outdir, sample_name, racon4_polish)
-        print("Executing fix repeat script")
-        subprocess.Popen("sed '/^>/ s/ .*//' -i " + infile6, shell=True).wait()
-        subprocess.Popen('bwa index ' + infile6, shell=True).wait()
-        bam_infile6 = "{0}/shortRead_polish_results/{1}_racon{2}_sort.bam".format(outdir, sample_name, racon4_polish)
-        subprocess.Popen('bwa mem -t ' + threads + ' ' + infile6 + ' ' + pe_reads + \
-                         ' | samtools sort -@ ' + threads + ' > ' + bam_infile6, shell=True).wait()
-        coverage_file = "{0}/shortRead_polish_results/coverage.txt".format(outdir)
-        subprocess.Popen('bedtools genomecov -d -ibam ' + bam_infile6 + ' > ' + coverage_file, shell=True).wait()
-        infile7 = "{0}/shortRead_polish_results/{1}_repeat_fix.fasta".format(outdir, sample_name)
-        tmp_directory = "{0}/shortRead_polish_results/tmp".format(outdir)
-        subprocess.Popen('python3 /data/opt/scripts/fix_repeats_ill.py -w ' + tmp_directory + ' -r ' + pe_reads + \
-                         ' -c ' + coverage_file + ' -g ' + infile6 + ' -o ' + infile7 + ' -t ' + threads, shell=True).wait()
-        print("Executing Racon for fifth and final round of polishing")
-        racon5_polish = 5
-        make_bwa_command(args.bwa_path, infile7, pe_reads, shortRead_polish_outdir, threads, racon5_polish)
-        sam_file5 = "{0}/shortRead_polish_results/align_{1}.sam".format(outdir, racon5_polish)
-        make_racon_shortRead_command(args.racon_path, pe_reads, sam_file5, infile6, outdir, sample_name,
-                                     threads, racon5_polish)
-        os.system('rm -r %s' % sam_file5)
-        os.system('rm -r %s' % tmp_directory)
-        print("Fin! Enjoy your day!")
-    if args.existing_contigs:
-        print("Circularization check with berokka and creating input for long-read initial round of polishing")
-        make_berokka_command(args.berokka_path, args.contigs, args.outdir)
-        infile1 = "{0}/berokka_results/02.trimmed.fa".format(outdir)
-        print("Removing potential self-contained contigs")
-        circlator_clean_outfile_prefix = "{0}/berokka_results/{1}_clean".format(outdir, sample_name)
-        make_circlator_clean_command(args.circlator_path, infile1, circlator_clean_outfile_prefix)
-        infile2 = "{0}/berokka_results/{1}_clean.fasta".format(outdir, sample_name)
-        print("Performing iterative long-read polishes with contig turning using Circlator Fixstart")
-        print("Perform Racon Polish #1")
-        longRead_outdir = '{0}/longRead_polish_results'.format(outdir)
-        create_directory(longRead_outdir)
-        racon1_polish = 1
-        make_minimap2_command(args.minimap2_path, infile2, long_reads, threads, longRead_outdir, racon1_polish)
-        sam_file1 = '{0}/longRead_polish_results/align_{1}.sam'.format(outdir, racon1_polish)
-        make_racon_longRead_command(args.racon_path, long_reads, sam_file1, infile2, outdir, sample_name, threads,
-                                    racon1_polish)
-        infile3 = "{0}/longRead_polish_results/{1}_racon{2}.fasta".format(outdir, sample_name, racon1_polish)
-        os.system('rm -r %s' % sam_file1)
-        print("Executing Circlator Fixstart to obtain start position(s)")
-        circlator_outfile_prefix = "{0}/longRead_polish_results/{1}_circlator".format(outdir, sample_name)
-        circlator_outfile = "{0}/longRead_polish_results/{1}_circlator.fasta".format(outdir, sample_name)
-        make_circlator_fixstart_command(args.circlator_path, args.dnaA_file, infile3, circlator_outfile_prefix)
+        if args.dnaA_file is None:
+            make_circlator_fixstart_command(args.circlator_path, default_db, infile3, circlator_outfile_prefix)
+        else:
+            make_circlator_fixstart_command(args.circlator_path, args.dnaA_file, infile3, circlator_outfile_prefix)
         print("Perform Racon Polish #2")
         racon2_polish = 2
         make_minimap2_command(args.minimap2_path, circlator_outfile, long_reads, threads, longRead_outdir,
@@ -328,7 +273,10 @@ def run_conditions():
         print("Executing circulating fixstart to rotate #2 and orient properly")
         circlator_outfile_prefix2 = "{0}/shortRead_polish_results/{1}_circlator2".format(outdir, sample_name)
         circlator_outfile2 = "{0}/shortRead_polish_results/{1}_circlator2.fasta".format(outdir, sample_name)
-        make_circlator_fixstart_command(args.circlator_path, args.dnaA_file, infile5, circlator_outfile_prefix2)
+        if args.dnaA_file is None:
+            make_circlator_fixstart_command(args.circlator_path, default_db, infile5, circlator_outfile_prefix2)
+        else:
+            make_circlator_fixstart_command(args.circlator_path, args.dnaA_file, infile5, circlator_outfile_prefix2)
         print("Executing Racon for fourth round of polishing")
         racon4_polish = 4
         make_bwa_command(args.bwa_path, circlator_outfile2, pe_reads, shortRead_polish_outdir, threads, racon4_polish)
@@ -337,7 +285,7 @@ def run_conditions():
                                      threads, racon4_polish)
         os.system('rm -r %s' % sam_file4)
         infile6 = "{0}/shortRead_polish_results/{1}_racon{2}.fasta".format(outdir, sample_name, racon4_polish)
-        print("Executing fix repeat script which generates final assembly")
+        print("Executing fix repeat script for final assembly")
         subprocess.Popen("sed '/^>/ s/ .*//' -i " + infile6, shell=True).wait()
         subprocess.Popen('bwa index ' + infile6, shell=True).wait()
         bam_infile6 = "{0}/shortRead_polish_results/{1}_racon{2}_sort.bam".format(outdir, sample_name, racon4_polish)
@@ -345,10 +293,90 @@ def run_conditions():
                          ' | samtools sort -@ ' + threads + ' > ' + bam_infile6, shell=True).wait()
         coverage_file = "{0}/shortRead_polish_results/coverage.txt".format(outdir)
         subprocess.Popen('bedtools genomecov -d -ibam ' + bam_infile6 + ' > ' + coverage_file, shell=True).wait()
-        infile7 = "{0}/shortRead_polish_results/{1}_repeat_fix.fasta".format(outdir, sample_name)
+        infile7 = "{0}/shortRead_polish_results/{1}_final.fasta".format(outdir, sample_name)
         tmp_directory = "{0}/shortRead_polish_results/tmp".format(outdir)
-        subprocess.Popen('python3 /data/opt/scripts/fix_repeats_ill.py -w ' + tmp_directory + ' -r ' + pe_reads + ' -c ' + coverage_file + \
-                         ' -g ' + infile6 + ' -o ' + infile7 + ' -t ' + threads, shell=True).wait()
+        os.makedirs(tmp_directory)
+        read_length = 300
+        fix_repeats.correct_regions(infile6, pe_reads, coverage_file, tmp_directory, infile7, read_length, threads)
+        os.system('rm -r %s' % tmp_directory)
+        print("Fin! Enjoy your day!")
+    if args.existing_contigs:
+        print("Circularization check with berokka and creating input for long-read initial round of polishing")
+        make_berokka_command(args.berokka_path, args.contigs, args.outdir)
+        infile1 = "{0}/berokka_results/02.trimmed.fa".format(outdir)
+        print("Removing potential self-contained contigs")
+        circlator_clean_outfile_prefix = "{0}/berokka_results/{1}_clean".format(outdir, sample_name)
+        make_circlator_clean_command(args.circlator_path, infile1, circlator_clean_outfile_prefix)
+        infile2 = "{0}/berokka_results/{1}_clean.fasta".format(outdir, sample_name)
+        print("Performing iterative long-read polishes with contig turning using Circlator Fixstart")
+        print("Perform Racon Polish #1")
+        longRead_outdir = '{0}/longRead_polish_results'.format(outdir)
+        create_directory(longRead_outdir)
+        racon1_polish = 1
+        make_minimap2_command(args.minimap2_path, infile2, long_reads, threads, longRead_outdir, racon1_polish)
+        sam_file1 = '{0}/longRead_polish_results/align_{1}.sam'.format(outdir, racon1_polish)
+        make_racon_longRead_command(args.racon_path, long_reads, sam_file1, infile2, outdir, sample_name, threads,
+                                    racon1_polish)
+        infile3 = "{0}/longRead_polish_results/{1}_racon{2}.fasta".format(outdir, sample_name, racon1_polish)
+        os.system('rm -r %s' % sam_file1)
+        print("Executing Circlator Fixstart to obtain start position(s)")
+        circlator_outfile_prefix = "{0}/longRead_polish_results/{1}_circlator".format(outdir, sample_name)
+        circlator_outfile = "{0}/longRead_polish_results/{1}_circlator.fasta".format(outdir, sample_name)
+        if args.dnaA_file is None:
+            make_circlator_fixstart_command(args.circlator_path, default_db, infile3, circlator_outfile_prefix)
+        else:
+            make_circlator_fixstart_command(args.circlator_path, args.dnaA_file, infile3, circlator_outfile_prefix)
+        print("Perform Racon Polish #2")
+        racon2_polish = 2
+        make_minimap2_command(args.minimap2_path, circlator_outfile, long_reads, threads, longRead_outdir,
+                              racon2_polish)
+        sam_file2 = '{0}/longRead_polish_results/align_{1}.sam'.format(outdir, racon2_polish)
+        make_racon_longRead_command(args.racon_path, long_reads, sam_file2, circlator_outfile, outdir, sample_name,
+                                    threads, racon2_polish)
+        os.system('rm -r %s' % sam_file2)
+        print("Perform long read polishes with Medaka")
+        medaka_input = "{0}/longRead_polish_results/{1}_racon{2}.fasta".format(outdir, sample_name, racon2_polish)
+        make_medaka_command(args.medaka_path, long_reads, medaka_input, outdir, threads)
+        print("Executing shortRead polishes with Racon")
+        infile4 = "{0}/medaka_results/consensus.fasta".format(outdir)
+        shortRead_polish_outdir = "{0}/shortRead_polish_results".format(outdir)
+        create_directory(shortRead_polish_outdir)
+        racon3_polish = 3
+        make_bwa_command(args.bwa_path, infile4, pe_reads, shortRead_polish_outdir, threads, racon3_polish)
+        print("Executing Racon for third round of polishing")
+        sam_file3 = "{0}/shortRead_polish_results/align_{1}.sam".format(outdir, racon3_polish)
+        make_racon_shortRead_command(args.racon_path, pe_reads, sam_file3, infile4, outdir, sample_name,
+                                     threads, racon3_polish)
+        os.system('rm -r %s' % sam_file3)
+        infile5 = "{0}/shortRead_polish_results/{1}_racon{2}.fasta".format(outdir, sample_name, racon3_polish)
+        print("Executing circulating fixstart to rotate #2 and orient properly")
+        circlator_outfile_prefix2 = "{0}/shortRead_polish_results/{1}_circlator2".format(outdir, sample_name)
+        circlator_outfile2 = "{0}/shortRead_polish_results/{1}_circlator2.fasta".format(outdir, sample_name)
+        if args.dnaA_file is None:
+            make_circlator_fixstart_command(args.circlator_path, default_db, infile5, circlator_outfile_prefix2)
+        else:
+            make_circlator_fixstart_command(args.circlator_path, args.dnaA_file, infile5, circlator_outfile_prefix2)
+        print("Executing Racon for fourth round of polishing")
+        racon4_polish = 4
+        make_bwa_command(args.bwa_path, circlator_outfile2, pe_reads, shortRead_polish_outdir, threads, racon4_polish)
+        sam_file4 = "{0}/shortRead_polish_results/align_{1}.sam".format(outdir, racon4_polish)
+        make_racon_shortRead_command(args.racon_path, pe_reads, sam_file4, circlator_outfile2, outdir, sample_name,
+                                     threads, racon4_polish)
+        os.system('rm -r %s' % sam_file4)
+        infile6 = "{0}/shortRead_polish_results/{1}_racon{2}.fasta".format(outdir, sample_name, racon4_polish)
+        print("Executing fix repeat script for final assembly")
+        subprocess.Popen("sed '/^>/ s/ .*//' -i " + infile6, shell=True).wait()
+        subprocess.Popen('bwa index ' + infile6, shell=True).wait()
+        bam_infile6 = "{0}/shortRead_polish_results/{1}_racon{2}_sort.bam".format(outdir, sample_name, racon4_polish)
+        subprocess.Popen('bwa mem -t ' + threads + ' ' + infile6 + ' ' + pe_reads + \
+                         ' | samtools sort -@ ' + threads + ' > ' + bam_infile6, shell=True).wait()
+        coverage_file = "{0}/shortRead_polish_results/coverage.txt".format(outdir)
+        subprocess.Popen('bedtools genomecov -d -ibam ' + bam_infile6 + ' > ' + coverage_file, shell=True).wait()
+        infile7 = "{0}/shortRead_polish_results/{1}_final.fasta".format(outdir, sample_name)
+        tmp_directory = "{0}/shortRead_polish_results/tmp".format(outdir)
+        os.makedirs(tmp_directory)
+        read_length = 300
+        fix_repeats.correct_regions(infile6, pe_reads, coverage_file, tmp_directory, infile7, read_length, threads)
         os.system('rm -r %s' % tmp_directory)
         print("Fin! Enjoy your day!")
 

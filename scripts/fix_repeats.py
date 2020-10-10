@@ -5,8 +5,6 @@ import subprocess
 import os
 import argparse
 
-
-
 # filters VCF file so that only alleles with a high frequency are included in output file
 def filter_vcf(in_file, out_file):
     with open(in_file) as vcf, open(out_file, 'w') as out:
@@ -22,10 +20,8 @@ def filter_vcf(in_file, out_file):
                             out.write(line)
                             continue
 
-
-
 # corrects low coverage regions
-def correct_regions(fasta_file, read_file, coverage_file, working_dir, out_file, read_file_2, read_length, no_of_threads):
+def correct_regions(fasta_file, read_file, coverage_file, working_dir, out_file, read_length, no_of_threads):
     low_cov = {}
     with open(coverage_file) as cov:
         # gets coverage and stores in dictionary with entry for each reference
@@ -87,10 +83,7 @@ def correct_regions(fasta_file, read_file, coverage_file, working_dir, out_file,
                         ref.write(j[k:k+60] + '\n')
     if there_is_a_low_cov:
         subprocess.Popen('bwa index ' + working_dir + '/ref.fa', shell=True).wait()
-        if read_file_2 is None: # if read_file_2 is set do a paired-end alignment, otherwise do a single end alignment
-            subprocess.Popen('bwa mem -t ' + no_of_threads + ' ' + working_dir + '/ref.fa ' + read_file + ' > ' + working_dir + '/ref.aln.sam', shell=True).wait()
-        else:
-            subprocess.Popen('bwa mem -t ' + no_of_threads + ' ' + working_dir + '/ref.fa ' + read_file + ' ' + read_file_2 + ' > ' + working_dir + '/ref.aln.sam', shell=True).wait()
+        subprocess.Popen('bwa mem -t ' + no_of_threads + ' ' + working_dir + '/ref.fa ' + read_file + ' > ' + working_dir + '/ref.aln.sam', shell=True).wait()
         subprocess.Popen('samtools faidx ' + working_dir + '/ref.fa ', shell=True).wait()
         subprocess.Popen('samtools view -bS -t ' + no_of_threads + ' ' + working_dir + '/ref.aln.sam > ' + working_dir + '/ref.aln.bam', shell=True).wait()
         subprocess.Popen('samtools sort -@ ' + no_of_threads + ' ' + working_dir + '/ref.aln.bam > ' + working_dir + '/ref.sort.bam', shell=True).wait()
@@ -149,10 +142,7 @@ def correct_regions(fasta_file, read_file, coverage_file, working_dir, out_file,
         os.remove(working_dir + '/ref2.vcf')
         os.remove(working_dir + '/ref2.vcf.gz')
         subprocess.Popen('bwa index ' + working_dir + '/ref.fa', shell=True).wait()
-        if read_file_2 is None:
-            subprocess.Popen('bwa mem -t ' + no_of_threads + ' ' + working_dir + '/ref.fa ' + read_file + ' > ' + working_dir + '/ref.aln.sam', shell=True).wait()
-        else:
-            subprocess.Popen('bwa mem -t ' + no_of_threads + ' ' + working_dir + '/ref.fa ' + read_file + ' ' + read_file_2 + ' > ' + working_dir + '/ref.aln.sam', shell=True).wait()
+        subprocess.Popen('bwa mem -t ' + no_of_threads + ' ' + working_dir + '/ref.fa ' + read_file + ' > ' + working_dir + '/ref.aln.sam', shell=True).wait()
         subprocess.Popen('samtools faidx ' + working_dir + '/ref.fa ', shell=True).wait()
         subprocess.Popen('samtools view -bS -t ' + no_of_threads + ' ' + working_dir + '/ref.aln.sam > ' + working_dir + '/ref.aln.bam', shell=True).wait()
         subprocess.Popen('samtools sort -@ ' + no_of_threads + ' ' + working_dir + '/ref.aln.bam > ' + working_dir + '/ref.sort.bam', shell=True).wait()
@@ -180,8 +170,6 @@ def correct_regions(fasta_file, read_file, coverage_file, working_dir, out_file,
             for j in range(0, len(seq), 80):
                 out.write(seq[j:j+80] + '\n')
 
-
-
 parser = argparse.ArgumentParser(prog='Fix_repeats_ill.py', formatter_class=argparse.RawDescriptionHelpFormatter, description='''
 fix_repeats_ill is a script for correcting repetitive elements in pacbio assemblies with Illumina data
 fix_repeats_ill.py
@@ -204,12 +192,14 @@ parser.add_argument('-o', '--output_fasta', action='store', help='place to write
 parser.add_argument('-t', '--no_of_threads', action='store', default='4', help='number of threads to use with bwa')
 parser.add_argument('-l', '--read_length', action='store', type=int, default=300, help='Length of reads [integer]')
 
-args = parser.parse_args()
+#args = parser.parse_args()
 
+#try:
+#    os.makedirs(args.working_dir)
+#except:
+#    pass
 
-try:
-    os.makedirs(args.working_dir)
-except:
-    pass
+#correct_regions(args.genome, args.read_file, args.coverage, args.working_dir, args.output_fasta, args.read_file_2, args.read_length, args.no_of_threads)
 
-correct_regions(args.genome, args.read_file, args.coverage, args.working_dir, args.output_fasta, args.read_file_2, args.read_length, args.no_of_threads)
+if __name__ == "__main__":
+    main()
