@@ -37,7 +37,10 @@ Required input are:
 (3) Interleaved paired-end short-reads (either gzip or non-compressed files will work)
 (4) **genome_size** estimated genome size based on previous knowledge of species (+/- 1 Mb genome size estimate is fine for flye k-mer selection)
 
-**Note that paired-end reads MUST be interleaved for racon to work. You can interleave short-read data using the `bbmap` tool `reformat.sh`. For racon to work properly, make sure there are underscores in lieu of white-space in headers of short-read fastq files by using the `underscore=t` option in `reformat.sh`**
+**Note that paired-end reads MUST be interleaved for racon to work. You can interleave short-read data using the `bbmap` tool `reformat.sh`. For racon to work properly, make sure there are underscores in lieu of white-space in headers of short-read fastq files by using the `underscore=t` option in `reformat.sh`. Example command-line for reformat.sh is as follows:**
+```
+$reformat.sh in1=PE_read1.fastq.gz in2=PE_read2.fastq.gz out=PEIL.fastq.gz underscore=t
+```
 
 ## Usage
 
