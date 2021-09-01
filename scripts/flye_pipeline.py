@@ -5,6 +5,18 @@ import subprocess
 import argparse
 import fix_repeats
 
+"""Notes for an eventual protocol for this pipeline"""
+# Note that you need a local install of flye to properly run the make_flye_command() function.
+# Note that you need a local install of berokka to properly run the make_berokka_command() function.
+# Note that you need a local install of circlator to properly run the circlator_fixstart_command() function.
+# Note that you need a local install of bwa to properly run the racon_command() function.
+# Note that you need a local install of racon to properly run the racon_command() function.
+# Note that you need a local install of minimap2 to properly run the minimap2_command() function.
+# Note that you need a local install of medaka to properly run the medaka_command() function. Note that this only runs
+# in <Python3.7 as version of tensorflow not supported by medaka. Other installation issues so be sure to check
+# GitHub page if problems with running (e.g. readlink -f not supported by iOS, need to download coreutils v8.25). If
+# errors persist
+
 # Common Functions -- Future pipeline will likely create a separate common module where these functions
 # could be separated into common classes.
 
@@ -20,26 +32,25 @@ def create_directory(outdir):
 
 # make_flye_command() passes 7 arguments, creates a simple flye command to be executed through the os by the subprocess
 # module, and sends output into the outdir provided in the command prompt.
-def make_flye_command(flye_path, long_reads, outdir, sample_name, genome_size, threads):
+
+def make_flye_command(flye_path, long_reads, outdir, sample_name, threads):
     # Fix the random seed so the program produces the same output every time it's run.
     # random.seed(1987)
     # Note, in order to use subprocess, you cannot use integer or float arguments, thus all arguments passed to subprocess
     # must be strings
-    flye_cmd = [flye_path, "--nano-raw", long_reads, "--genome-size", genome_size,
-                "-o", "{0}/flye_assembly".format(outdir, sample_name), "--threads", threads]
+    flye_cmd = [flye_path, "--nano-raw", long_reads, "-o", "{0}/flye_assembly".format(outdir), "--threads", threads]
     print("Performing Flye Assembly")
     subprocess.run(flye_cmd)
     print("Flye Assembly Finished")
     flye_directory = "{0}/flye_assembly".format(outdir)
     return flye_directory
 
-def make_flye_command_alt(flye_path, long_reads, outdir, sample_name, genome_size, threads):
+def make_flye_command_alt(flye_path, long_reads, outdir, sample_name, threads):
     # Fix the random seed so the program produces the same output every time it's run.
     # random.seed(1987)
     # Note, in order to use subprocess, you cannot use integer or float arguments, thus all arguments passed to subprocess
     # must be strings
-    flye_cmd = [flye_path, "--nano-raw", long_reads, "--genome-size", genome_size,
-                "-o", "{0}/flye_assembly".format(outdir, sample_name), "--plasmids", "--meta", "--threads", threads]
+    flye_cmd = [flye_path, "--nano-raw", long_reads, "-o", "{0}/flye_assembly".format(outdir), "--plasmids", "--meta", "--threads", threads]
     print("Performing Flye Assembly")
     subprocess.run(flye_cmd)
     print("Flye Assembly Finished")
@@ -99,7 +110,7 @@ def make_medaka_command(medaka_path, long_reads, contigs, outdir, threads):
 # Add This '-m' parameter as arugment and set 'r941_min_high' as default, which is the medaka default as well and what
 # we usually use to train our algorithms.
     medaka_cmd = ['{0}'.format(medaka_path), '-i', long_reads, '-d', contigs, '-o',
-                  '{0}/medaka_results'.format(outdir), '-m', 'r941_min_high_g344', '-t', threads]
+                  '{0}/medaka_results'.format(outdir), '-m', 'r941_min_high_g360', '-t', threads]
     subprocess.run(medaka_cmd)
     return
 
@@ -134,33 +145,32 @@ def get_arguments():
     # Help arguments
     help_group = parser.add_argument_group("Help")
     help_group.add_argument('-h', '--help', action='help', help='Show this help message and exit')
-    help_group.add_argument('-V', '--version', action='version', version='%(prog)s version 1.0',
+    help_group.add_argument('-V', '--version', action='version', version='%(prog)s version 0.6',
                             help="Show Assembler's version number")
 
     # input_arguments
     input_group = parser.add_argument_group("Inputs")
-    input_group.add_argument('-pe', '--pe_reads', required=True, help='Interleaved paired-end short reads', type=str,
+    input_group.add_argument('-pe', '--pe_reads', required=True, help='interleave paired-end reads', type=str,
                              default=None)
-    input_group.add_argument('-l', '--long_reads', required=True, help="ONT uncorrected long reads", type=str,
+    input_group.add_argument('-l', '--long_reads', required=True, help="Path to the ONT long reads", type=str,
                              default=None)
-    input_group.add_argument('-o', '--outdir', required=True, help="Output directory for results", type=str,
+    input_group.add_argument('-d', '--dnaA_file', required=False, help="dnaA (default) start sites", type=str,
                             default=None)
-    input_group.add_argument('-g', '--genome_size', required=False, help="Estimated genome size for assembly", 
-                            default=None)
+    input_group.add_argument('-o', '--outdir', required=True, help="Name of the output directory", type=str,
+                                default=None)
     
     # Optional arguments
     optional_group = parser.add_argument_group("Optional inputs")
     optional_group.add_argument('-s', '--sample_name', required=False, help="Name of the sample to use in the "
                                 "outdir/outfiles as prefix", type=str, default='SAMPLE')
-    optional_group.add_argument('-mp', help="add \'meta\' and \'plasmid\' Flye options for assembly", action ='store_true')
-    optional_group.add_argument('-d', '--dnaA_file', required=False, help="dnaA (default) start sites", type=str,
-                            default=None)
-    optional_group.add_argument('-x', '--existing_contigs', required=False, action="store_true", help="Indicate if existing"
-                                "contigs are going to be used from previous assembly and corrected", default=False)
-    optional_group.add_argument('-c', '--contigs', required=False, help="Existing assembly fasta file to be corrected", type=str,
-                            default=None)
+    optional_group.add_argument('-mp', help="add \'meta\' and \'plasmid\' Flye options", action ='store_true')
+    optional_group.add_argument('-x', '--existing_contigs', required=False, action="store_true",
+                             help='indicate if existing contigs are going to be used from previous assembly.',
+                             default=False)
+    optional_group.add_argument('-c', '--contigs', required=False, help="existing contigs fasta file", type=str,
+                             default=None)
     optional_group.add_argument('-t', '--threads', required=False, help="Number of threads to run program", type=str,
-                            default='1')
+                                default='1')
     # Pipeline arguments
     pipeline_group = parser.add_argument_group("Pipeline Arguments")
     pipeline_group.add_argument('--flye_path', required=False, help="Path to flye executable; please use \'flye\' if"
@@ -199,12 +209,12 @@ def run_conditions():
     # conditional argument that executes assembly + circularization check
     if not args.existing_contigs:
         if args.mp is True:
-            make_flye_command_alt(args.flye_path, long_reads, outdir, sample_name, args.genome_size, threads)
+            make_flye_command_alt(args.flye_path, long_reads, outdir, sample_name, threads)
             os.system("mv %s %s" % ("{0}/flye_assembly/assembly.fasta".format(outdir, sample_name),
                                     "{0}/flye_assembly/{1}_assembly.fasta".format(outdir, sample_name)))
             infile0 = "{0}/flye_assembly/{1}_assembly.fasta".format(outdir, sample_name)
         else:
-            make_flye_command(args.flye_path, long_reads, outdir, sample_name, args.genome_size, threads)
+            make_flye_command(args.flye_path, long_reads, outdir, sample_name, threads)
             os.system("mv %s %s" % ("{0}/flye_assembly/assembly.fasta".format(outdir, sample_name),
                                 "{0}/flye_assembly/{1}_assembly.fasta".format(outdir, sample_name)))
             infile0 = "{0}/flye_assembly/{1}_assembly.fasta".format(outdir, sample_name)
